@@ -137,6 +137,7 @@ def cluster_all(table):
                 query=f'"{table_name}"."{column["name"]}"', name=f'{column["name"]}')
     return query
 
+
 def minimal_cluster(table):
     query = pql.PQL()
     table_name = table.name
@@ -167,31 +168,32 @@ def range_specifier(range, activity=""):
         return "CASE_START"
 
 
-def calc_throughput(table, query):
-    range_start = range_specifier("first", "pay expenses")
-    range_end = range_specifier("end")
-    query +=  pql.PQLFilter(f"""CALC_THROUGHPUT ( {range_start} TO {range_end}, REMAP_TIMESTAMPS ( "{table.name}"."END", MINUTES ) ) = CALC_THROUGHPUT ( {range_start} TO {range_end}, REMAP_TIMESTAMPS ( "{table.name}"."END", MINUTES ) ) """) 
+def calc_throughput(table, query, range_start=range_specifier("start"), range_end=range_specifier("end")):
+    query += pql.PQLFilter(f"""CALC_THROUGHPUT ( {range_start} TO {range_end}, REMAP_TIMESTAMPS ( "{table.name}"."END", MINUTES ) ) = CALC_THROUGHPUT ( {range_start} TO {range_end}, REMAP_TIMESTAMPS ( "{table.name}"."END", MINUTES ) ) """)
     print(query)
     return query
 
+
 def add_throughput(table, query):
-    query += pql.PQLColumn(query=f"""DATEDIFF ( mm , "{table.name}"."START" , "{table.name}"."END" )""", name="case:throughput")
+    query += pql.PQLColumn(
+        query=f"""DATEDIFF ( mm , "{table.name}"."START" , "{table.name}"."END" )""", name="case:throughput")
     return query
+
 
 def minimal_cluster_and_throughput(table):
     query = minimal_cluster(table)
     query = add_throughput(table, query)
     return query
 
-query = minimal_cluster_and_throughput(celonis.datamodels.find("MobIS").tables[0])
+
+query = minimal_cluster_and_throughput(
+    celonis.datamodels.find("MobIS").tables[0])
 celonis.datamodels.find("MobIS").get_data_frame(query).to_csv("filtered.csv")
 
 """ query = calc_throughput(celonis.datamodels.find(
     "MobIS").tables[0], minimal_cluster
 (celonis.datamodels.find("MobIS").tables[0]))
 celonis.datamodels.find("MobIS").get_data_frame(query).to_csv("filtered.csv") """
-
-
 
 
 """ #q = pql.PQL()

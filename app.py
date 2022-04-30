@@ -93,6 +93,16 @@ def get_avg_cluster_throughput():
     return response
 
 
+@app.route("/casesforcluster")
+def cases_for_cluster():
+    cluster_id = request.args.get("cluster_id")
+    query = cases_for_cluster(GLOBAL_VARS["datamodel"].tables[0], cluster_id)
+    GLOBAL_VARS["dataframe"] = GLOBAL_VARS["datamodel"]._get_data_frame(query)
+    response = jsonify(data="success")
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    return response
+
+
 if __name__ == '__main__':
 
     app.run(port=5003, debug=True)

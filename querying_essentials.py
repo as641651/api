@@ -118,7 +118,12 @@ def get_data(model):
         model.get_data_frame(query).to_csv(f"{query}.csv")
 
 
-def cluster_all(table):
+def minimal_cluster(table):
+    """
+    minimal_cluster returns a minimal version query that clusters all the data in a table with the variant being the activity
+    :param table: datamodeltable
+    :return: query
+    """
     query = pql.PQL()
     table_name = table.name
     for column in table.columns:
@@ -132,30 +137,31 @@ def cluster_all(table):
         elif column["name"] == "CASE":
             query += pql.PQLColumn(query=f'"{table_name}"."{column["name"]}"',
                                    name="case:concept:name")
-        else:
+    return query
+
+
+def cluster_all(table):
+    """
+    cluster_all returns a query that clusters all the data in a table with the variant being the activity
+    :param table: datamodeltable
+    :return: query
+    """
+    query = minimal_cluster(table)
+    table_name = table.name
+    for column in table.columns:
+        if column["name"] not in ["ACTIVITY", "CASE"]:
             query += pql.PQLColumn(
                 query=f'"{table_name}"."{column["name"]}"', name=f'{column["name"]}')
     return query
 
 
-def minimal_cluster(table):
-    query = pql.PQL()
-    table_name = table.name
-    for column in table.columns:
-        if column["name"] == "ACTIVITY":
-            query += pql.PQLColumn(
-                query=f'{table_name}.{column["name"]}', name=f'case:{column["name"].lower()}')
-            query += pql.PQLColumn(
-                query=f'VARIANT( {table_name}.{column["name"]} )', name='case:variant')
-            query += pql.PQLColumn(query=f'CLUSTER_VARIANTS ( VARIANT (  {table_name}.{column["name"]} ) , 2 , 2 )',
-                                   name="case:cluster_id")
-        elif column["name"] == "CASE":
-            query += pql.PQLColumn(query=f'"{table_name}"."{column["name"]}"',
-                                   name="case:concept:name")
-    return query
-
-
 def range_specifier(range, activity=""):
+    """
+    range_specifier returns a query that specifies a range of values for a specific activity
+    :param range: range of values (enum of "all", "end", "first", or"last" 
+    :param activity: activity to specify the range for
+    return: query for the range/activity
+    """
     if range == "all":
         return f"ALL_OCCURRENCES ['{activity}']"
     elif range == "end":
@@ -169,29 +175,53 @@ def range_specifier(range, activity=""):
 
 
 def calc_throughput(table, query, range_start=range_specifier("start"), range_end=range_specifier("end")):
+    """
+    calc_throughput calculates the throughput of a specific query for a specific table
+    :param table: datamodeltable
+    :param query: query to add the throughput filter to
+    :param range_start: start of the range
+    :param range_end: end of the range
+    :return: throughput of the query
+    """
     query += pql.PQLFilter(f"""CALC_THROUGHPUT ( {range_start} TO {range_end}, REMAP_TIMESTAMPS ( "{table.name}"."END", MINUTES ) ) = CALC_THROUGHPUT ( {range_start} TO {range_end}, REMAP_TIMESTAMPS ( "{table.name}"."END", MINUTES ) ) """)
     print(query)
     return query
 
 
 def add_throughput(table, query):
+    """
+    add_throughput adds the throughput filter to a query
+    :param table: datamodeltable
+    :param query: query to add the throughput filter to
+    :return: query with the throughput filter
+    """
     query += pql.PQLColumn(
         query=f"""DATEDIFF ( hh , "{table.name}"."START" , "{table.name}"."END" )""", name="case:throughput")
     return query
 
 
 def minimal_cluster_and_throughput(table):
+    """
+    minimal_cluster_and_throughput returns a minimal version query that clusters all the data in a table with the variant being the activity and adds the throughput filter
+    :param table: datamodeltable
+    :return: query
+    """
     query = minimal_cluster(table)
     query = add_throughput(table, query)
     return query
 
 
-query = minimal_cluster_and_throughput(
+""" query = minimal_cluster_and_throughput(
     celonis.datamodels.find("MobIS").tables[0])
-celonis.datamodels.find("MobIS").get_data_frame(query).to_csv("filtered.csv")
+celonis.datamodels.find("MobIS").get_data_frame(query).to_csv("filtered.csv") """
 
 
 def throughput_per_cluster(table):
+    """
+    throughput_per_cluster returns a query that calculates the throughput per cluster for a specific table
+    :param table: datamodeltable
+    :return: query
+    """
     query = pql.PQL()
     query += pql.PQLColumn(
         f'CLUSTER_VARIANTS ( VARIANT ( {table.name}."ACTIVITY" ), 2, 2 ) ', "cluster"
@@ -209,6 +239,13 @@ def throughput_per_cluster(table):
 
 
 def get_cases_for_cluster(activity_table, cluster_id, case_table=""):
+    """
+    get_cases_for_cluster returns a query that gets all cases for a specific cluster
+    :param activity_table: datamodeltable
+    :param cluster_id: cluster id
+    :param case_table: datamodeltable
+    :return: query
+    """
     query = pql.PQL()
     if case_table != "":
         query += pql.PQLColumn(""" "{case_table}"."CASE" """, 'case_id')

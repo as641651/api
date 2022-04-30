@@ -33,7 +33,6 @@ def load_data():
     response = jsonify(data="success")
     response.headers.add('Access-Control-Allow-Origin', '*')
     return response
-    
 
 
 @app.route("/cluster")
@@ -77,22 +76,13 @@ def get_activities_count():
 @app.route("/throughput")
 def calc_throughput():
     if GLOBAL_VARS["datamodel_name"] == "MobIS":
-        query = PQL()
-        query += PQL(
-            f'CALC_THROUGHPUT ( {range_specifier("all", "pay expenses")} TO {range_specifier("all", "decide on travel expense approval")}, REMAP_TIMESTAMPS( "mobis_challenge_log_2019_csv"."END", MINUTES ) )')
-        GLOBAL_VARS["celonis"].datamodels.find(
-            "a45a4f06-668e-461b-9c4a-80167ccdaf42").get_data_frame(query)
-
-
-def range_specifier(range, activity=""):
-    if range == "first":
-        return f"FIRST_OCCURRENCE ['{activity}']"
-    elif range == "last":
-        return f"LAST_OCCURRENCE ['{activity}']"
-    elif range == "end":
-        return "CASE_END"
-    elif range == "all":
-        return f"ALL_OCCURRENCES ['{activity}']"
+        query = minimal_cluster_and_throughput(
+            GLOBAL_VARS["datamodel"].tables[0])
+        GLOBAL_VARS["dataframe"] = GLOBAL_VARS["datamodel"]._get_data_frame(
+            query)
+    response = jsonify(data="success")
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    return response
 
 
 if __name__ == '__main__':

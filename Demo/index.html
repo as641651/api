@@ -1,0 +1,47 @@
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <!--Import Google Icon Font-->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <!-- Compiled and minified CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
+    <script src="https://unpkg.com/vue@3.0.2"></script>
+</head>
+<body>
+    <div class="section indigo white-text center">
+        Variant Clusters
+    </div>
+    <br>
+
+    <div id="app">
+
+        <div class="container center">
+            <a href="#" @click="loadData('MobIS')" class="btn indigo" id="loadData">Load Data</a>
+        </div>
+    
+        <br>
+        <div class="container center">
+            <a href="#" @click="clusterData()" class="btn indigo" id="clusterData">Cluster</a>
+        </div>
+    
+        <br>
+        <div class="container center">
+            <a href="#" @click="getTraces()" class="btn indigo" id="traces">Get Traces</a>
+        </div>
+
+        <br>
+        <div class="container center">
+            <a href="#" @click="getActivitiesCount()" class="btn indigo" id="activitiesCount">Activities Count</a>
+        </div>
+      
+    
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+        <script src="index.js"></script>
+
+    </div>
+
+</body>
+</html>

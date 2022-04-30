@@ -75,11 +75,19 @@ def get_activities_count():
 
 @app.route("/throughput")
 def calc_throughput():
-    if GLOBAL_VARS["datamodel_name"] == "MobIS":
-        query = minimal_cluster_and_throughput(
-            GLOBAL_VARS["datamodel"].tables[0])
-        GLOBAL_VARS["dataframe"] = GLOBAL_VARS["datamodel"]._get_data_frame(
-            query)
+    query = minimal_cluster_and_throughput(
+        GLOBAL_VARS["datamodel"].tables[0])
+    GLOBAL_VARS["dataframe"] = GLOBAL_VARS["datamodel"]._get_data_frame(
+        query)
+    response = jsonify(data="success")
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    return response
+
+
+@app.route("/avgclusterthroughput")
+def get_avg_cluster_throughput():
+    query = throughput_per_cluster(GLOBAL_VARS["datamodel"].tables[0])
+    GLOBAL_VARS["dataframe"] = GLOBAL_VARS["datamodel"]._get_data_frame(query)
     response = jsonify(data="success")
     response.headers.add('Access-Control-Allow-Origin', '*')
     return response

@@ -176,7 +176,7 @@ def calc_throughput(table, query, range_start=range_specifier("start"), range_en
 
 def add_throughput(table, query):
     query += pql.PQLColumn(
-        query=f"""DATEDIFF ( mm , "{table.name}"."START" , "{table.name}"."END" )""", name="case:throughput")
+        query=f"""DATEDIFF ( hh , "{table.name}"."START" , "{table.name}"."END" )""", name="case:throughput")
     return query
 
 
@@ -190,23 +190,35 @@ query = minimal_cluster_and_throughput(
     celonis.datamodels.find("MobIS").tables[0])
 celonis.datamodels.find("MobIS").get_data_frame(query).to_csv("filtered.csv")
 
+
+def throughput_per_cluster(table):
+    query = pql.PQL()
+    query += pql.PQLColumn(
+        f'CLUSTER_VARIANTS ( VARIANT ( {table.name}."ACTIVITY" ), 2, 2 ) ', "cluster"
+    )
+    query += pql.PQLColumn(
+        f'AVG ('
+        f'  CALC_THROUGHPUT ( '
+        f'      CASE_START TO CASE_END, '
+        f'      REMAP_TIMESTAMPS ( {table.name}."START", MINUTES ) '
+        f'  ) '
+        f')',
+        "avg_throughput_time"
+    )
+    return query
+
+
+def get_cases_for_cluster(activity_table, cluster_id, case_table=""):
+    query = pql.PQL()
+    if case_table != "":
+        query += pql.PQLColumn(""" "{case_table}"."CASE" """, 'case_id')
+    query += pql.PQLColumn(
+        f'VARIANT ( {activity_table}."ACTIVITY" )', "variant")
+    query += pql.PQLFilter(
+        f'FILTER CLUSTER_VARIANTS ( VARIANT ( {activity_table}."ACTIVITY" ), 3, 3 ) = {cluster_id}')
+
+
 """ query = calc_throughput(celonis.datamodels.find(
     "MobIS").tables[0], minimal_cluster
 (celonis.datamodels.find("MobIS").tables[0]))
 celonis.datamodels.find("MobIS").get_data_frame(query).to_csv("filtered.csv") """
-
-
-""" #q = pql.PQL()
-#q += pql.PQL(f"{get_table_names(model)[0]}.{get_columns_for_table(get_tables(model)[0])[2]['name']}")
-#q += pql.PQL(f"SELECT * from {get_tables(model)[0]};")
-
-q += pql.PQLColumn(
-    f"VARIANT({get_table_names(model)[0]}.{get_columns_for_table(get_tables(model)[0])[2]['name']})", "Variant")
-q += pql.PQLColumn(
-    f"CLUSTER_VARIANTS( VARIANT({get_table_names(model)[0]}.{get_columns_for_table(get_tables(model)[0])[2]['name']}), 2, 1)", "Cluster") 
-
-for table in get_tables(model):
-    table.get_data_frame().to_json(f"{table.name}.json")
-#df = model.get_data_frame(q)
-# df.to_json("test.json")
-# df.to_csv("clusterized_test.csv") """

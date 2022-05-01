@@ -38,18 +38,37 @@ def load_data():
 @app.route("/cluster")
 def cluster_variants():
     if GLOBAL_VARS["datamodel_name"] == "MobIS":
+        #estimate_cluster_params();
         query = PQL()
         query += PQLColumn(query='"mobis_challenge_log_2019_csv"."CASE"', name="case:concept:name")
         query += PQLColumn(query='"mobis_challenge_log_2019_csv"."ACTIVITY"', name="concept:name")
         query += PQLColumn(query='"mobis_challenge_log_2019_csv"."START"', name="timestamp")
         query += PQLColumn(query=' VARIANT ( "mobis_challenge_log_2019_csv"."ACTIVITY" )', name="case:variant")
-        query += PQLColumn(query='CLUSTER_VARIANTS ( VARIANT ( "mobis_challenge_log_2019_csv"."ACTIVITY" ) , 40 , 2 )',
+        query += PQLColumn(query='CLUSTER_VARIANTS ( VARIANT ( "mobis_challenge_log_2019_csv"."ACTIVITY" ) , 40 ,3 )',
                            name="case:cluster_id")
-
+        # query += PQLColumn(query='CLUSTER_VARIANTS ( VARIANT ( "mobis_challenge_log_2019_csv"."ACTIVITY" ) ,  , 2 )',
+        #                     name="case:cluster_id")
+        #query += PQLColumn(query=f'CLUSTER_VARIANTS ( VARIANT ( "mobis_challenge_log_2019_csv"."ACTIVITY" ) , {GLOBAL_VARS["cluster_params"]} , 4 )',
+        #                   name="case:cluster_id")
         GLOBAL_VARS["dataframe"] = GLOBAL_VARS["datamodel"]._get_data_frame(query)
-        response = jsonify(data="success")
-        response.headers.add('Access-Control-Allow-Origin', '*')
-        return response
+        response = jsonify(data="success mobis")
+
+    if GLOBAL_VARS["datamodel_name"] == "SAP P2P":
+        query = PQL()
+        query += PQLColumn(query='"_CEL_P2P_ACTIVITIES_EN_parquet"."_CASE_KEY"', name="case:concept:name")
+        query += PQLColumn(query='"_CEL_P2P_ACTIVITIES_EN_parquet"."ACTIVITY_EN"', name="concept:name")
+        query += PQLColumn(query='"_CEL_P2P_ACTIVITIES_EN_parquet"."EVENTTIME"', name="timestamp")
+        query += PQLColumn(query=' VARIANT ( "_CEL_P2P_ACTIVITIES_EN_parquet"."ACTIVITY_EN" )', name="case:variant")
+        query += PQLColumn(
+            query='CLUSTER_VARIANTS ( VARIANT ( "_CEL_P2P_ACTIVITIES_EN_parquet"."ACTIVITY_EN" ) , 40 , 2 )',
+            name="case:cluster_id")
+        #print(query)
+        #GLOBAL_VARS["dataframe"] = GLOBAL_VARS["datamodel"]._get_data_frame(query)
+        GLOBAL_VARS["dataframe"] = utils.get_sap_p2p_df()
+        response = jsonify(data="success p2p")
+
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    return response
 
 @app.route("/tracecounts")
 def get_trace_counts():
@@ -67,6 +86,16 @@ def get_variants_table():
     #response.headers.add('Access-Control-Allow-Origin', '*')
     return response
 
+@app.route("/topclustersactivities")
+def get_top_clusters_activities():
+    top_clusters_activities, GLOBAL_VARS['num_clusters'] = utils.get_top_clusters_activities(GLOBAL_VARS["variant_table"])
+    response = jsonify(data=top_clusters_activities)
+    return response
+
+@app.route("/numclusters")
+def get_num_clusters():
+    response = jsonify(data=GLOBAL_VARS['num_clusters'])
+    return response
 
 @app.route("/activitiescounts")
 def get_activities_count():
@@ -76,6 +105,92 @@ def get_activities_count():
         response.headers.add('Access-Control-Allow-Origin', '*')
         return response
 
+def estimate_cluster_params():
+    query = PQL()
+    query += PQLColumn(
+        query='ESTIMATE_CLUSTER_PARAMS( VARIANT ( "mobis_challenge_log_2019_csv"."ACTIVITY" ), 2, 10, 10 )')
+
+    GLOBAL_VARS["cluster_params"] = GLOBAL_VARS["datamodel"]._get_data_frame(query)
+    print(GLOBAL_VARS["cluster_params"])
+    #469,280,203,132
+
+    #exit(-1)
+
+@app.route("/throughput")
+def get_cluster_throughput():
+
+    #print(request.args.get("clusters"))
+    #exit(-1)
+
+    cluster_ids = list(map(int, request.args.get("clusters").split(",")))
+
+    if GLOBAL_VARS["datamodel_name"] == "MobIS":
+        data = get_throughput_mobis(cluster_ids)
+    if GLOBAL_VARS["datamodel_name"] == "SAP P2P":
+        data = get_throughput_csv(cluster_ids)
+
+    #print(data)
+    #exit(-1)
+
+    response = jsonify(data=data)
+    return response
+
+def get_throughput_csv(cluster_ids):
+    throughput_df = pd.read_csv('data/sap_throughput.csv', sep=',')
+
+    throughput_df['avg_throughput_time'] = throughput_df['avg_throughput_time'].apply(lambda x: x / 60. / 24.)
+
+    GLOBAL_VARS["cluster_throughputs"] = throughput_df
+
+    data = []
+    for cluster in cluster_ids:
+        vals = throughput_df.loc[throughput_df['cluster'] == cluster].values
+        data.append([int(vals[0][0]), int(vals[0][1])])
+
+    return data
+
+def get_throughput_mobis(cluster_ids):
+
+
+    activity_table_activity = '"mobis_challenge_log_2019_csv"."ACTIVITY"'
+    activity_table_timestamp = '"mobis_challenge_log_2019_csv"."END"'
+
+    throughput_per_cluster = PQL()
+    throughput_per_cluster += PQLColumn(
+        f'CLUSTER_VARIANTS ( VARIANT ( {activity_table_activity} ), 40, 3 ) ', "cluster"
+    )
+    throughput_per_cluster += PQLColumn(
+        f'AVG ('
+        f'  CALC_THROUGHPUT ( '
+        f'      CASE_START TO CASE_END, '
+        f'      REMAP_TIMESTAMPS ( {activity_table_timestamp}, MINUTES ) '
+        f'  ) '
+        f')',
+        "avg_throughput_time"
+    )
+
+    throughput_df = GLOBAL_VARS["datamodel"]._get_data_frame(throughput_per_cluster)
+
+    GLOBAL_VARS["cluster_throughputs"] = throughput_df
+
+    throughput_df['avg_throughput_time'] = throughput_df['avg_throughput_time'].apply(lambda x: x / 60. / 24.)
+
+    data = []
+    for cluster in cluster_ids:
+        vals = throughput_df.loc[throughput_df['cluster'] == cluster].values
+        data.append([int(vals[0][0]), int(vals[0][1])])
+
+    return data
+
+@app.route("/throughput-all")
+def get_cluster_throughput_all():
+    df = GLOBAL_VARS["cluster_throughputs"]
+    df = df.loc[df['cluster'] != -1].set_index('cluster')
+    json_data = df.to_json(orient='index')
+    response = {'data': json_data}
+    return response
+
+
 if __name__ == '__main__':
 
-    app.run(port=5003, debug=True)
+    app.run(port=5003,debug=True)
